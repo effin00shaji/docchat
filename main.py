@@ -85,3 +85,10 @@ def get_saved_results():
     """Fetch previously saved results from MongoDB without recomputing."""
     clusters = list(db["ranked_clusters"].find({}, {"_id": 0}).sort("score", -1).limit(20))
     return {"top_results": clusters}
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
