@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DocChat — Exam & Interview Question Analyzer</title>
+<style>
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    max-width: 900px;
+    margin: 40px auto;
+    padding: 0 20px;
+  }
+  h1 { color: #38bdf8; }
+  .upload-box {
+    border: 2px dashed #334155;
+    padding: 30px;
+    text-align: center;
+    border-radius: 12px;
+    margin-bottom: 20px;
+  }
+  button {
+    background: #38bdf8;
+    color: #0f172a;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+  button:hover { background: #0ea5e9; }
+  button:disabled { background: #334155; cursor: not-allowed; }
+  .cluster-card {
+    background: #1e293b;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 14px;
+  }
+  .cluster-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .badge {
+    background: #38bdf8;
+    color: #0f172a;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    font-weight: bold;
+  }
+  .question-item {
+    font-size: 0.9em;
+    color: #94a3b8;
+    margin: 4px 0;
+  }
+  #status { margin-top: 10px; color: #facc15; }
+  #loader { display: none; color: #38bdf8; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<h1>📚 DocChat</h1>
+<p>Upload exam papers or interview question sets — find out what's actually important.</p>
+
+<div class="upload-box">
+  <input type="file" id="fileInput" accept="application/pdf" multiple>
+  <br>
+  <button onclick="uploadFiles()">Upload PDF(s)</button>
+  <div id="status"></div>
+</div>
+
+<button onclick="runAnalysis()" id="analyzeBtn">🔍 Analyze Uploaded PDFs</button>
+<button onclick="loadSavedResults()">📂 Load Saved Results</button>
+<div id="loader">Processing... this can take a minute ⏳</div>
+
+<h2>Top Important Topics</h2>
+<div id="results"></div>
+
+<script>
+const API_BASE = "http://127.0.0.1:8000";
+
+async function uploadFiles() {
+  const input = document.getElementById("fileInput");
+  const status = document.getElementById("status");
+  if (!input.files.length) {
+    status.textContent = "Please select at least one PDF.";
+    return;
+  }
+  status.textContent = "Uploading...";
+  for (const file of input.files) {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`${API_BASE}/upload`, { method: "POST", body: formData });
+    const data = await res.json();
+    status.textContent = `Uploaded: ${data.filename}`;
+  }
+  status.textContent = "All files uploaded. Click 'Analyze' to process.";
+}
+
+async function runAnalysis() {
+  const loader = document.getElementById("loader");
+  const resultsDiv = document.getElementById("results");
+  loader.style.display = "block";
+  resultsDiv.innerHTML = "";
+  try {
+    const res = await fetch(`${API_BASE}/analyze`);
+    const data = await res.json();
+    loader.style.display = "none";
+    if (data.error) {
+      resultsDiv.innerHTML = `<p style="color:#f87171">${data.error}</p>`;
+      return;
+    }
+    renderResults(data.top_results, data.total_questions, data.total_clusters);
+  } catch (err) {
+    loader.style.display = "none";
+    resultsDiv.innerHTML = `<p style="color:#f87171">Error: ${err}</p>`;
+  }
+}
+
+async function loadSavedResults() {
+  const resultsDiv = document.getElementById("results");
+  resultsDiv.innerHTML = "Loading saved results...";
+  const res = await fetch(`${API_BASE}/results`);
+  const data = await res.json();
+  renderResults(data.top_results, null, null);
+}
+
+function renderResults(results, totalQ, totalC) {
+  const resultsDiv = document.getElementById("results");
+  resultsDiv.innerHTML = "";
+  if (totalQ) {
+    resultsDiv.innerHTML += `<p>Analyzed ${totalQ} questions across ${totalC} topic clusters.</p>`;
+  }
+  results.forEach((r, i) => {
+    const card = document.createElement("div");
+    card.className = "cluster-card";
+    card.innerHTML = `
+      <div class="cluster-header">
+        <strong>#${i + 1}</strong>
+        <span class="badge">${r.distinct_sources} source(s) · ${r.size} questions</span>
+      </div>
+      ${r.sample_questions.map((q, idx) =>
+        `<div class="question-item">• [${r.sample_sources[idx]}] ${q}</div>`
+      ).join("")}
+    `;
+    resultsDiv.appendChild(card);
+  });
+}
+</script>
+
+</body>
+</html>
