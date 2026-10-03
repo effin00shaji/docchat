@@ -1,156 +1,311 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>DocChat — Exam & Interview Question Analyzer</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DocChat: find the questions that keep coming back</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet">
 <style>
+  :root {
+    --bg: #0b1220;
+    --panel: #111b2e;
+    --line: #243553;
+    --text: #e6edf7;
+    --muted: #93a4c0;
+    --accent: #38bdf8;
+    --accent-ink: #04202e;
+    --error: #ff7b7b;
+    --ui: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --read: "Source Serif 4", Georgia, "Times New Roman", serif;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
   body {
-    font-family: 'Segoe UI', sans-serif;
-    background: #0f172a;
-    color: #e2e8f0;
-    max-width: 900px;
-    margin: 40px auto;
-    padding: 0 20px;
+    margin: 0;
+    color: var(--text);
+    font: 16px/1.55 var(--ui);
+    background: var(--bg);
   }
-  h1 { color: #38bdf8; }
-  .upload-box {
-    border: 2px dashed #334155;
-    padding: 30px;
-    text-align: center;
-    border-radius: 12px;
-    margin-bottom: 20px;
-  }
-  button {
-    background: #38bdf8;
-    color: #0f172a;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 8px;
-    font-weight: bold;
-    cursor: pointer;
-    margin-top: 10px;
-  }
-  button:hover { background: #0ea5e9; }
-  button:disabled { background: #334155; cursor: not-allowed; }
-  .cluster-card {
-    background: #1e293b;
+  main { max-width: 760px; margin: 0 auto; padding: 56px 20px 96px; }
+  h1 { font: 600 2.1rem/1.15 var(--read); margin: 0 0 10px; letter-spacing: -0.01em; }
+  .lede { color: var(--muted); margin: 0 0 32px; max-width: 56ch; }
+
+  .upload {
+    background: var(--panel);
+    border: 1px solid var(--line);
     border-radius: 10px;
-    padding: 16px 20px;
-    margin-bottom: 14px;
+    padding: 20px;
   }
-  .cluster-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
+  .upload label.pick {
+    display: inline-block;
+    padding: 9px 14px;
+    border: 1px dashed var(--accent);
+    border-radius: 8px;
+    color: var(--accent);
+    cursor: pointer;
+    font-weight: 500;
   }
-  .badge {
-    background: #38bdf8;
-    color: #0f172a;
-    padding: 3px 10px;
-    border-radius: 20px;
-    font-size: 0.8em;
-    font-weight: bold;
+  .upload input[type=file] { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .upload input[type=file]:focus-visible + label.pick { outline: 2px solid var(--text); outline-offset: 3px; }
+  .hint { color: var(--muted); font-size: 0.9rem; margin: 10px 0 0; }
+  #fileList { list-style: none; margin: 14px 0 0; padding: 0; }
+  #fileList li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 0.95rem; }
+  #fileList li span:last-child { color: var(--muted); white-space: nowrap; }
+  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 18px; }
+  button {
+    font: 600 1rem var(--ui);
+    border: 0;
+    border-radius: 8px;
+    padding: 11px 18px;
+    cursor: pointer;
   }
-  .question-item {
-    font-size: 0.9em;
-    color: #94a3b8;
-    margin: 4px 0;
-  }
-  #status { margin-top: 10px; color: #facc15; }
-  #loader { display: none; color: #38bdf8; margin-top: 10px; }
+  button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+  #analyzeBtn { background: var(--accent); color: var(--accent-ink); }
+  #analyzeBtn:disabled { opacity: 0.45; cursor: not-allowed; }
+  #sampleBtn { background: none; color: var(--accent); padding: 11px 4px; text-decoration: underline; text-underline-offset: 3px; }
+
+  #status { margin: 22px 0 0; min-height: 1.5em; color: var(--muted); }
+  #status.error { color: var(--error); }
+  .bar { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; margin-top: 10px; }
+  .bar i { display: block; height: 100%; width: 35%; background: var(--accent); animation: slide 1.4s ease-in-out infinite; }
+  @keyframes slide { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
+  @media (prefers-reduced-motion: reduce) { .bar i { animation: none; width: 100%; opacity: 0.5; } }
+
+  #results h2 { font: 600 1.35rem/1.3 var(--read); margin: 44px 0 6px; }
+  .summary { color: var(--muted); margin: 0 0 22px; font-size: 0.95rem; }
+  .item { padding: 22px 0; border-top: 1px solid var(--line); }
+  .item .q { font: 500 1.2rem/1.45 var(--read); margin: 0 0 12px; }
+  .freq { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 0.9rem; margin-bottom: 12px; }
+  .freq .track { flex: 0 0 140px; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+  .freq .track i { display: block; height: 100%; background: var(--accent); }
+  .points { margin: 0 0 12px; padding-left: 1.2em; }
+  .points li { margin: 3px 0; }
+  details { color: var(--muted); font-size: 0.95rem; }
+  summary { cursor: pointer; color: var(--accent); }
+  details ul { margin: 8px 0 0; padding-left: 1.2em; }
+  details li { margin: 4px 0; }
+  .empty { color: var(--muted); }
 </style>
 </head>
 <body>
+<main>
+  <h1>DocChat</h1>
+  <p class="lede">Upload exam papers or interview question sets as PDFs. DocChat groups similar questions and shows which ones come up most often.</p>
 
-<h1>📚 DocChat</h1>
-<p>Upload exam papers or interview question sets — find out what's actually important.</p>
+  <section class="upload" aria-label="Upload PDFs">
+    <input id="fileInput" type="file" accept="application/pdf,.pdf" multiple>
+    <label class="pick" for="fileInput">Choose PDF files</label>
+    <p class="hint">Up to 3 PDFs, 10 MB each. Works best with text-based PDFs (not scans) that have numbered questions.</p>
+    <ul id="fileList"></ul>
+    <div class="actions">
+      <button id="analyzeBtn" type="button" disabled>Upload and analyze</button>
+      <button id="sampleBtn" type="button">See sample results</button>
+    </div>
+  </section>
 
-<div class="upload-box">
-  <input type="file" id="fileInput" accept="application/pdf" multiple>
-  <br>
-  <button onclick="uploadFiles()">Upload PDF(s)</button>
-  <div id="status"></div>
-</div>
-
-<button onclick="runAnalysis()" id="analyzeBtn">🔍 Analyze Uploaded PDFs</button>
-<button onclick="loadSavedResults()">📂 Load Saved Results</button>
-<div id="loader">Processing... this can take a minute ⏳</div>
-
-<h2>Top Important Topics</h2>
-<div id="results"></div>
+  <div id="status" role="status" aria-live="polite"></div>
+  <section id="results" aria-label="Results"></section>
+</main>
 
 <script>
 const API_BASE = "https://docchat-1-aq1m.onrender.com";
+const MAX_FILES = 3;
+const MAX_MB = 10;
+const POLL_MS = 3000;
+const GIVE_UP_MS = 15 * 60 * 1000;
 
-async function uploadFiles() {
-  const input = document.getElementById("fileInput");
-  const status = document.getElementById("status");
-  if (!input.files.length) {
-    status.textContent = "Please select at least one PDF.";
+const $ = (id) => document.getElementById(id);
+const fileInput = $("fileInput");
+const analyzeBtn = $("analyzeBtn");
+const sampleBtn = $("sampleBtn");
+const statusEl = $("status");
+const resultsEl = $("results");
+const fileListEl = $("fileList");
+
+function el(tag, props, ...kids) {
+  const node = document.createElement(tag);
+  if (props) for (const k in props) {
+    if (k === "class") node.className = props[k];
+    else node.setAttribute(k, props[k]);
+  }
+  for (const kid of kids) node.append(kid);
+  return node;
+}
+
+function setStatus(text, opts = {}) {
+  statusEl.className = opts.error ? "error" : "";
+  statusEl.replaceChildren(text);
+  if (opts.busy) statusEl.append(el("div", { class: "bar" }, el("i")));
+}
+
+function setBusy(busy) {
+  analyzeBtn.disabled = busy || selectedFiles().length === 0;
+  sampleBtn.disabled = busy;
+  fileInput.disabled = busy;
+}
+
+function selectedFiles() {
+  return Array.from(fileInput.files || []);
+}
+
+function mb(bytes) {
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+}
+
+fileInput.addEventListener("change", () => {
+  const files = selectedFiles();
+  fileListEl.replaceChildren();
+  let problem = "";
+  if (files.length > MAX_FILES) problem = `Choose at most ${MAX_FILES} files.`;
+  for (const f of files) {
+    if (!f.name.toLowerCase().endsWith(".pdf")) problem = `${f.name} is not a PDF.`;
+    else if (f.size > MAX_MB * 1024 * 1024) problem = `${f.name} is larger than ${MAX_MB} MB.`;
+    fileListEl.append(el("li", null, el("span", null, f.name), el("span", null, mb(f.size))));
+  }
+  if (problem) {
+    fileInput.value = "";
+    fileListEl.replaceChildren();
+    setStatus(problem, { error: true });
+  } else {
+    setStatus("");
+  }
+  analyzeBtn.disabled = selectedFiles().length === 0;
+});
+
+async function readError(res) {
+  try {
+    const body = await res.json();
+    if (typeof body.detail === "string") return body.detail;
+  } catch (_) {}
+  return `The server returned an error (${res.status}).`;
+}
+
+const NETWORK_MSG = "Couldn't reach the server. It may still be waking up, so try again in a minute.";
+
+analyzeBtn.addEventListener("click", async () => {
+  const files = selectedFiles();
+  if (!files.length) return;
+  resultsEl.replaceChildren();
+  setBusy(true);
+  setStatus("Sending your files. If the server was idle, it can take up to a minute to wake up.", { busy: true });
+
+  const form = new FormData();
+  files.forEach((f) => form.append("files", f));
+
+  let jobId;
+  try {
+    const res = await fetch(`${API_BASE}/analyze-upload`, { method: "POST", body: form });
+    if (!res.ok) throw new Error(await readError(res));
+    jobId = (await res.json()).job_id;
+  } catch (err) {
+    setStatus(err instanceof TypeError ? NETWORK_MSG : err.message, { error: true });
+    setBusy(false);
     return;
   }
-  status.textContent = "Uploading...";
-  for (const file of input.files) {
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch(`${API_BASE}/upload`, { method: "POST", body: formData });
-    const data = await res.json();
-    status.textContent = `Uploaded: ${data.filename}`;
-  }
-  status.textContent = "All files uploaded. Click 'Analyze' to process.";
-}
+  poll(jobId, Date.now());
+});
 
-async function runAnalysis() {
-  const loader = document.getElementById("loader");
-  const resultsDiv = document.getElementById("results");
-  loader.style.display = "block";
-  resultsDiv.innerHTML = "";
+async function poll(jobId, startedAt) {
+  const elapsed = Math.round((Date.now() - startedAt) / 1000);
+  if (Date.now() - startedAt > GIVE_UP_MS) {
+    setStatus("This is taking too long. Please try again with fewer or smaller files.", { error: true });
+    setBusy(false);
+    return;
+  }
   try {
-    const res = await fetch(`${API_BASE}/analyze`);
-    const data = await res.json();
-    loader.style.display = "none";
-    if (data.error) {
-      resultsDiv.innerHTML = `<p style="color:#f87171">${data.error}</p>`;
+    const res = await fetch(`${API_BASE}/jobs/${jobId}`);
+    if (!res.ok) throw new Error(await readError(res));
+    const job = await res.json();
+    if (job.status === "done") {
+      setStatus("");
+      renderResults(job.result.top_results, {
+        heading: "Most repeated questions",
+        summary: summaryLine(job.result),
+      });
+      setBusy(false);
       return;
     }
-    renderResults(data.top_results, data.total_questions, data.total_clusters);
+    if (job.status === "error") {
+      setStatus(job.error || "The analysis failed. Please try again.", { error: true });
+      setBusy(false);
+      return;
+    }
+    setStatus(`${job.message} (${elapsed}s)`, { busy: true });
   } catch (err) {
-    loader.style.display = "none";
-    resultsDiv.innerHTML = `<p style="color:#f87171">Error: ${err}</p>`;
+    if (!(err instanceof TypeError)) {
+      setStatus(err.message, { error: true });
+      setBusy(false);
+      return;
+    }
+    // brief network hiccup: keep polling
   }
+  setTimeout(() => poll(jobId, startedAt), POLL_MS);
 }
 
-async function loadSavedResults() {
-  const resultsDiv = document.getElementById("results");
-  resultsDiv.innerHTML = "Loading saved results...";
-  const res = await fetch(`${API_BASE}/results`);
-  const data = await res.json();
-  renderResults(data.top_results, null, null);
+function summaryLine(result) {
+  const files = result.files.length;
+  let line = `Found ${result.total_questions} questions in ${files} ${files === 1 ? "file" : "files"}.`;
+  if (result.truncated) line += ` Analyzed an even sample of ${result.analyzed_questions} to keep this fast.`;
+  return line;
 }
 
-function renderResults(results, totalQ, totalC) {
-  const resultsDiv = document.getElementById("results");
-  resultsDiv.innerHTML = "";
-  if (totalQ) {
-    resultsDiv.innerHTML += `<p>Analyzed ${totalQ} questions across ${totalC} topic clusters.</p>`;
+sampleBtn.addEventListener("click", async () => {
+  resultsEl.replaceChildren();
+  setBusy(true);
+  setStatus("Loading sample results. If the server was idle, it can take up to a minute to wake up.", { busy: true });
+  try {
+    const res = await fetch(`${API_BASE}/results`);
+    if (!res.ok) throw new Error(await readError(res));
+    const data = await res.json();
+    setStatus("");
+    renderResults(data.top_results || [], {
+      heading: "Sample results",
+      summary: "Results from a large set of interview and exam questions.",
+    });
+  } catch (err) {
+    setStatus(err instanceof TypeError ? NETWORK_MSG : err.message, { error: true });
   }
-  results.forEach((r, i) => {
-    const card = document.createElement("div");
-    card.className = "cluster-card";
-    card.innerHTML = `
-      <div class="cluster-header">
-        <strong>#${i + 1}</strong>
-        <span class="badge">${r.distinct_sources} source(s) · ${r.size} questions</span>
-      </div>
-      ${r.sample_questions.map((q, idx) =>
-        `<div class="question-item">• [${r.sample_sources[idx]}] ${q}</div>`
-      ).join("")}
-    `;
-    resultsDiv.appendChild(card);
+  setBusy(false);
+});
+
+function renderResults(items, { heading, summary }) {
+  resultsEl.replaceChildren();
+  if (!items.length) {
+    resultsEl.append(el("p", { class: "empty" }, "No results to show yet."));
+    return;
+  }
+  resultsEl.append(el("h2", null, heading), el("p", { class: "summary" }, summary));
+  const maxSize = Math.max(...items.map((i) => i.size || 1));
+
+  items.forEach((item) => {
+    const samples = item.sample_questions || [];
+    const title = item.canonical_question || samples[0] || "Question group";
+    const files = item.distinct_sources || 1;
+    const freqText = `${item.size} similar ${item.size === 1 ? "question" : "questions"} across ${files} ${files === 1 ? "file" : "files"}`;
+
+    const card = el("article", { class: "item" });
+    card.append(el("p", { class: "q" }, title));
+
+    const bar = el("i");
+    bar.style.width = Math.max(4, Math.round(((item.size || 1) / maxSize) * 100)) + "%";
+    card.append(el("div", { class: "freq" }, el("div", { class: "track" }, bar), el("span", null, freqText)));
+
+    if (item.key_points && item.key_points.length) {
+      const ul = el("ul", { class: "points" });
+      item.key_points.forEach((p) => ul.append(el("li", null, p)));
+      card.append(ul);
+    }
+
+    if (samples.length) {
+      const list = el("ul");
+      samples.forEach((s) => list.append(el("li", null, s.length > 220 ? s.slice(0, 220) + "…" : s)));
+      card.append(el("details", null, el("summary", null, `Show ${samples.length} of the similar questions`), list));
+    }
+    resultsEl.append(card);
   });
 }
 </script>
-
 </body>
 </html>
